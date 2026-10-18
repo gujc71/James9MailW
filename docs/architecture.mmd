@@ -1,0 +1,22 @@
+%% Source of docs/architecture.svg (rendered to docs/architecture.png)
+flowchart LR
+    M["Mail clients (MUA)<br/>Thunderbird · Outlook · mobile<br/>mail · calendar · contacts"]
+    C["James9Mail Web Client<br/>React · Dexie cache · postal-mime<br/>Browser :5173"]
+    L[("Local mirror (IndexedDB)<br/>Dexie · per account · offline read<br/>list · bodies (LRU 300) · mailboxes")]
+    W["James9Mail Web Server<br/>Fastify · Kysely · nodemailer<br/>NodeJS :4000"]
+    J["James9Mail Server<br/>WebAdmin :8000 · SMTP :25<br/>JSieve · JPA"]
+    DB[("DBMS (MariaDB)<br/>james_db")]
+    FS[/"Shared filesystem<br/>maildir · staging · large"/]
+    EXT["External mail servers"]
+
+    C -- "/api · /large" --> W
+    C -. "delta sync · MODSEQ · tombstone" .-> L
+    W -- "read · direct SQL" --> DB
+    W -- "write · WebAdmin" --> J
+    W -- "send · SMTP 25" --> J
+    W -. "raw mail · attachments" .-> FS
+    J -- "JPA read · write" --> DB
+    J -. "store raw mail" .-> FS
+    J -- "relay" --> EXT
+    M -- "CalDAV · CardDAV (/dav)" --> W
+    M -- "SMTP · IMAP" --> J

@@ -1,0 +1,301 @@
+/*
+ * 메일 본문 리치 텍스트 에디터 (Callout9 의 Lexical 에디터 이식).
+ *  - 클래스는 전부 lx- 로 묶는다. 메일 앱에 이미 .tb/.btn 이 있어 그대로 두면 겹친다.
+ *  - 색·반경은 styles.css 의 토큰만 쓴다.
+ */
+
+.lx-shell {
+  position: relative;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* 메일쓰기 본문 칸은 세로 flex 안에 있다. 줄어들지 않게 못 박는다 */
+  flex: 0 0 auto;
+}
+.lx-mount { display: flex; flex-direction: column; min-height: 0; }
+.lx-loading {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.lx-loading.err { color: var(--danger); }
+
+/* ───────────────────────────── 툴바 */
+.lx-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px; row-gap: 4px;
+  padding: 1px 2px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--panel-soft); z-index: 2;
+}
+.lx-tb {
+  border: 1px solid transparent; background: none; border-radius: var(--r-xs);
+  padding: 4px 8px; font-size: 12.5px; color: var(--muted); min-width: 30px;
+  cursor: pointer; line-height: 1.3;
+}
+.lx-tb:hover { background: var(--panel-sunken); color: var(--text); border-color: var(--border); }
+.lx-tb b { font-weight: 800; }
+.lx-tb svg { display: block; width: 15px; height: 15px; }
+.lx-tb.on { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-soft-2); }
+.lx-tb:disabled { opacity: .35; cursor: not-allowed; background: none; }
+.lx-tb:disabled:hover { background: none; color: var(--muted); border-color: transparent; }
+.lx-sep { width: 1px; background: var(--border); margin: 4px 3px; align-self: stretch; }
+
+.lx-select {
+  border: 1px solid var(--border); background: var(--panel); border-radius: var(--r-xs);
+  padding: 3px 6px; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.lx-select:hover { background: var(--panel-sunken); }
+
+/* 항목마다 아이콘을 보여 줘야 해서 select 대신 직접 그린 드롭다운 */
+.lx-pick { position: relative; display: inline-flex; }
+.lx-pick svg { display: block; width: 15px; height: 15px; flex: none; }
+.lx-pick .lx-ico { display: flex; color: var(--muted); }
+.lx-pick-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); background: var(--panel); border-radius: var(--r-xs);
+  padding: 3px 5px 3px 7px; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.lx-pick-btn:hover { background: var(--panel-sunken); }
+.lx-pick-btn:hover .lx-ico, .lx-pick-opt:hover .lx-ico { color: var(--text); }
+.lx-pick-btn .lx-lbl { min-width: 50px; text-align: left; }
+.lx-pick-btn .lx-lbl.w { min-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-pick-btn .lx-caret { font-size: 9px; color: var(--muted); line-height: 1; }
+.lx-pick-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 136px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  box-shadow: var(--sh-2);
+}
+.lx-pick-menu.wide { min-width: 184px; }
+.lx-pick-menu[hidden] { display: none; }
+.lx-pick-opt {
+  display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-radius: var(--r-xs);
+  background: none; padding: 5px 8px; font-size: 12.5px; color: var(--text);
+  text-align: left; cursor: pointer;
+}
+.lx-pick-opt:hover { background: var(--panel-sunken); }
+.lx-pick-opt.on { background: var(--accent-soft); color: var(--accent-text); }
+.lx-pick-opt.on .lx-ico { color: var(--accent-text); }
+.lx-pick-opt.kbd::after {
+  content: attr(data-kbd); margin-left: auto; padding-left: 14px; font-size: 10.5px; color: var(--muted);
+}
+
+.lx-color {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 1px solid transparent; border-radius: var(--r-xs); padding: 3px 7px; cursor: pointer;
+  background: none; font: inherit; font-size: 12.5px; line-height: 1; color: var(--muted);
+}
+.lx-color:hover, .lx-color[aria-expanded="true"] { background: var(--panel-sunken); color: var(--text); border-color: var(--border); }
+.lx-color .lx-swatch { width: 16px; height: 4px; border-radius: 1px; border: 1px solid var(--border); }
+.lx-color:disabled { opacity: .35; pointer-events: none; }
+
+/* 색 팔레트: Tableau 10 x 7단계(위 진함 → 아래 흐림) + 최근 사용한 색 */
+/* 편집기 루트가 overflow: hidden 이라 화면 기준(fixed)으로 띄운다. 위치는 JS가 정한다 */
+.lx-cmenu { position: fixed; top: 0; left: 0; z-index: 150; padding: 6px 8px 4px; min-width: 0; }
+.lx-cmenu .lx-pick-opt { padding: 5px 4px; }
+.lx-cmenu .lx-cmore { margin-top: 8px; border-top: 1px solid var(--border); border-radius: 0; padding-top: 8px; }
+.lx-chead { font-size: 11px; color: var(--muted); margin: 6px 0 4px; }
+.lx-cgrid { display: grid; grid-template-columns: repeat(10, 18px); gap: 2px; min-height: 18px; }
+.lx-cell {
+  width: 18px; height: 18px; padding: 0; cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, .12); border-radius: 2px;
+}
+.lx-cell:hover, .lx-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; position: relative; z-index: 1; }
+.lx-cell.on { box-shadow: inset 0 0 0 2px var(--panel); outline: 2px solid var(--text); outline-offset: 0; }
+.lx-cempty { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); align-self: center; }
+.lx-nochip {
+  width: 16px; height: 16px; flex: none; border: 1px solid var(--border-strong); border-radius: 2px;
+  background: linear-gradient(to top right, transparent calc(50% - .75px), var(--danger) calc(50% - .75px),
+              var(--danger) calc(50% + .75px), transparent calc(50% + .75px));
+}
+
+/* "다른 색…": 채도·명도 판 + 색상 슬라이더 + 16진수 입력 + 취소/확인 */
+.lx-custom { width: 198px; padding: 2px 0 4px; }
+.lx-custom[hidden], .lx-cmenu > div[hidden] { display: none; }
+.lx-sv {
+  position: relative; height: 130px; border-radius: var(--r-xs); cursor: crosshair;
+  touch-action: none; border: 1px solid var(--border);
+}
+.lx-sv-dot {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); pointer-events: none;
+}
+.lx-hue {
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 12px; margin: 8px 0 0;
+  border-radius: 6px; cursor: pointer;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.lx-hue::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 1px solid rgba(0, 0, 0, .45); box-shadow: var(--sh-1, 0 1px 2px rgba(0,0,0,.2));
+}
+.lx-hue::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 1px solid rgba(0, 0, 0, .45);
+}
+.lx-hue:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lx-crow { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.lx-cprev { width: 28px; height: 24px; flex: none; border-radius: var(--r-xs); border: 1px solid var(--border); }
+.lx-hex {
+  flex: 1; min-width: 0; height: 24px; padding: 0 6px; font: 12.5px ui-monospace, Consolas, monospace;
+  border: 1px solid var(--border-strong); border-radius: var(--r-xs); background: var(--panel); color: var(--text);
+}
+.lx-hex:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring); }
+.lx-hex.bad { border-color: var(--danger); }
+.lx-cact { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.lx-btn.lx-btn-ok { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lx-btn.lx-btn-ok:hover { filter: brightness(1.08); background: var(--accent); color: #fff; }
+
+
+/* ───────────────────────────── 입력칸 */
+.lx-holder { position: relative; flex: 1; min-height: 0; overflow: auto; }
+.lx-input, .lx-source {
+  min-height: 260px; padding: 14px 16px; outline: none;
+  font-size: 14px; line-height: 1.75; caret-color: var(--accent);
+}
+.lx-source {
+  width: 100%; border: none; resize: none; display: block;
+  font-family: ui-monospace, 'SF Mono', Consolas, 'D2Coding', monospace; font-size: 13px;
+}
+/* hidden 속성이 위 display 규칙에 밀리지 않도록 명시한다 */
+.lx-input[hidden], .lx-source[hidden] { display: none; }
+.lx-ph { position: absolute; top: 0; left: 0; pointer-events: none; color: var(--muted); padding: 14px 16px; }
+.lx-ph[hidden] { display: none; }
+
+.lx-input h1 { font-size: 22px; margin: .7em 0 .35em; font-weight: 700; }
+.lx-input h2 { font-size: 18px; margin: .9em 0 .3em; font-weight: 700; }
+.lx-input h3 { font-size: 15.5px; margin: .9em 0 .3em; font-weight: 700; }
+.lx-input h4 { font-size: 15px; margin: .9em 0 .3em; font-weight: 700; }
+.lx-input h5 { font-size: 14px; margin: .9em 0 .3em; font-weight: 700; }
+.lx-input h6 { font-size: 13px; margin: .9em 0 .3em; font-weight: 700; color: var(--muted); }
+.lx-input p { margin: .45em 0; }
+.lx-input ul, .lx-input ol { margin: .45em 0; padding-left: 1.5em; }
+.lx-input li { margin: .15em 0; }
+.lx-input blockquote {
+  margin: .7em 0; padding: .4em 12px .4em 14px; border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-xs) var(--r-xs) 0; background: var(--accent-soft); color: var(--accent-text);
+}
+.lx-input blockquote p { margin: .2em 0; }
+.lx-input code {
+  font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
+  background: var(--danger-soft); border: 1px solid #f3d2d2; border-radius: 3px;
+  padding: 1px 4px; color: #b02626;
+}
+.lx-input pre code { background: none; border: none; padding: 0; color: inherit; }
+.lx-input pre {
+  font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--panel-sunken);
+  border: 1px solid var(--border); border-radius: var(--r-xs); padding: 12px 14px;
+  overflow: auto; white-space: pre-wrap;
+}
+.lx-input a { color: var(--accent); text-decoration: underline; }
+.lx-input .b { font-weight: 700; }
+.lx-input .i { font-style: italic; }
+.lx-input .s { text-decoration: line-through; }
+.lx-input .u { text-decoration: underline; }
+.lx-input table { border-collapse: collapse; margin: .7em 0; font-size: 13.5px; }
+.lx-input th, .lx-input td { border: 1px solid var(--border-strong); padding: 6px 10px; text-align: left; vertical-align: top; }
+.lx-input th { background: var(--panel-sunken); font-weight: 650; }
+.lx-input hr { border: 0; border-top: 1px solid var(--border-strong); margin: 1.1em 0; }
+.lx-input hr.sel { border-top-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.lx-input sub, .lx-input sup { font-size: .72em; line-height: 0; }
+.lx-input mark { background: #fff2a8; color: inherit; border-radius: 2px; padding: 0 1px; }
+/* 붙여넣은 인라인 이미지. 본문 칸보다 큰 그림이 들어와도 넘치지 않게 눌러 둔다 */
+.lx-input img { max-width: 100%; height: auto; vertical-align: bottom; border-radius: 2px; }
+
+/* 체크 목록 — 클릭으로 토글해야 해서 표시는 ::before 로 그린다 */
+.lx-input ul.cl { list-style: none; padding-left: 1.5em; }
+.lx-input ul.cl li { position: relative; padding-left: 6px; }
+.lx-input li.li-o::before, .lx-input li.li-x::before {
+  content: ''; position: absolute; left: -1.25em; top: .36em; width: 13px; height: 13px;
+  border: 1.4px solid var(--border-strong); border-radius: 3px; background: var(--panel); cursor: pointer;
+}
+.lx-input li.li-x::before { background: var(--accent); border-color: var(--accent); }
+.lx-input li.li-x::after {
+  content: ''; position: absolute; left: -1.09em; top: .55em; width: 6px; height: 3px;
+  border-left: 1.6px solid #fff; border-bottom: 1.6px solid #fff; transform: rotate(-45deg); pointer-events: none;
+}
+.lx-input li.li-x { color: var(--muted); text-decoration: line-through; }
+
+/* 드래그로 고른 표 칸 */
+.lx-input .tbl { table-layout: fixed; width: calc(100% - 2px); overflow: hidden; }
+.lx-input .tbl-c, .lx-input .tbl-h { position: relative; min-width: 64px; }
+.lx-input .tbl-c.sel-cell, .lx-input .tbl-h.sel-cell { background: var(--accent-soft); }
+.lx-input .tbl-c::selection, .lx-input .tbl-h::selection { background: transparent; }
+
+/* 코드 블록 하이라이트 (Prism 토큰) */
+.lx-input .tk-c { color: var(--muted); font-style: italic; }
+.lx-input .tk-k { color: var(--accent-text); font-weight: 600; }
+.lx-input .tk-s { color: #b02626; }
+.lx-input .tk-n { color: #8a5a00; }
+.lx-input .tk-f { color: var(--syntax-field); }
+.lx-input .tk-o { color: var(--text-2); }
+.lx-input .tk-p { color: var(--muted); }
+
+/* ───────────────────────────── 찾기·바꾸기 */
+.lx-find {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px;
+  border-bottom: 1px solid var(--border); background: var(--panel-sunken);
+  position: sticky; top: 0; z-index: 1;
+}
+.lx-find[hidden] { display: none; }
+.lx-find input {
+  border: 1px solid var(--border-strong); border-radius: var(--r-xs); padding: 4px 8px;
+  font-size: 13px; min-width: 120px; flex: 1 1 120px; background: var(--panel);
+}
+.lx-find input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring); }
+.lx-find .lx-hits {
+  font-size: 11px; color: var(--muted); white-space: nowrap;
+  font-variant-numeric: tabular-nums; min-width: 52px; text-align: center;
+}
+.lx-find label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+.lx-find label input { min-width: 0; flex: none; margin: 0; }
+.lx-btn {
+  border: 1px solid var(--border-strong); background: var(--panel); color: var(--text-2);
+  border-radius: var(--r-xs); padding: 4px 9px; font-size: 12.5px; cursor: pointer;
+}
+.lx-btn:hover { background: var(--panel-soft); color: var(--text); }
+/* 찾은 곳 전부를 브라우저 하이라이트 레지스트리로 칠한다 (DOM 을 건드리지 않는다) */
+::highlight(lx-hit) { background: #ffe58a; color: var(--text); }
+
+/* ───────────────────────────── 링크 팝오버 */
+.lx-link {
+  position: absolute; z-index: 30; display: flex; align-items: center; gap: 6px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  box-shadow: var(--sh-2);
+}
+.lx-link[hidden] { display: none; }
+.lx-link input {
+  border: 1px solid var(--border-strong); border-radius: var(--r-xs); padding: 4px 8px;
+  font-size: 12.5px; width: 246px; font-family: ui-monospace, Consolas, monospace;
+}
+.lx-link input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring); }
+.lx-link a { font-size: 12.5px; color: var(--accent); max-width: 246px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-tbtn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); border-radius: var(--r-xs); background: var(--panel);
+  color: var(--text-2); cursor: pointer;
+}
+.lx-tbtn:hover { background: var(--panel-soft); color: var(--text); }
+.lx-tbtn svg { width: 15px; height: 15px; }
+
+/* ───────────────────────────── HTML 소스 보기 */
+.lx-src { display: flex; min-height: 260px; font-size: 13px; line-height: 1.6; }
+.lx-src[hidden] { display: none; }
+.lx-gutter {
+  flex: 0 0 auto; padding: 14px 8px 14px 12px; text-align: right; color: var(--muted);
+  background: var(--panel-sunken); border-right: 1px solid var(--border);
+  user-select: none; white-space: pre; font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+/* ───────────────────────────── 에디터 안 알림 */
+.lx-toast {
+  position: absolute; left: 50%; bottom: 12px; transform: translate(-50%, 8px);
+  max-width: 82%; padding: 7px 14px; border-radius: var(--r-pill);
+  background: rgba(21, 25, 34, .9); color: #fff; font-size: 12.5px;
+  box-shadow: var(--sh-2); opacity: 0; pointer-events: none;
+  transition: opacity var(--t), transform var(--t); z-index: 40;
+}
+.lx-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.lx-toast.err { background: var(--danger); }

@@ -1,0 +1,23 @@
+{
+  "name": "james9mail-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "james9Mail 기능별 Playwright 테스트 (mock / api / e2e 3계층)",
+  "scripts": {
+    "test": "playwright test --project=mock",
+    "test:ui": "playwright test --project=mock --ui",
+    "test:headed": "playwright test --project=mock --headed --workers=1",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=e2e",
+    "test:all": "playwright test",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen http://localhost:5173",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.1",
+    "@types/node": "^22.13.5",
+    "typescript": "^5.7.3"
+  }
+}

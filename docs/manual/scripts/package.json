@@ -1,0 +1,19 @@
+{
+  "name": "james9mail-manual-capture",
+  "private": true,
+  "type": "module",
+  "description": "사용자 매뉴얼(docs/manual/ko, docs/manual/en) 화면 캡처 스크립트",
+  "scripts": {
+    "cleanup": "node cleanup.mjs",
+    "seed": "node seed.mjs",
+    "seed:en": "cross-env MANUAL_LOCALE=en node seed.mjs",
+    "capture": "node cap-mail.mjs && node cap-compose.mjs && node cap-cal.mjs && node cap-settings.mjs",
+    "capture:en": "cross-env MANUAL_LOCALE=en npm run capture",
+    "all:ko": "npm run cleanup && npm run seed && npm run capture",
+    "all:en": "npm run cleanup && npm run seed:en && npm run capture:en"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "playwright": "1.63.0"
+  }
+}

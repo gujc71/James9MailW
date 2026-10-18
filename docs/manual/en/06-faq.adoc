@@ -1,0 +1,96 @@
+= 6. FAQ
+:tip-caption: Good to know
+:figure-caption!:
+:table-caption!:
+
+xref:05-settings.adoc[← 5. Preferences] · xref:README.adoc[Contents]
+
+[[signing-in-and-your-account]]
+== Signing in and your account
+
+**Q. I forgot my password.**
+Ask your administrator to reset it. After signing in with the new password, change it in xref:05-settings.adoc#change-password[Profile].
+
+**Q. It says I cannot sign in for a while.**
+After several wrong passwords, signing in is blocked for a few minutes. Try again later.
+
+**Q. I was suddenly signed out.**
+
+* Changing your password elsewhere signs out all other sessions.
+* Sessions expire after a certain time. Sign in again.
+* Your administrator may have suspended your account.
+
+**Q. The screen is in Korean.**
+Sign out, choose **English** on the sign-in screen and sign in again.
+
+[[receiving-mail]]
+== Receiving mail
+
+**Q. New mail does not show up right away.**
+Webmail checks for new mail every 30 seconds. To see it immediately, click the mailbox again or refresh with F5.
+
+**Q. I do not get new-mail notifications.**
+
+* Check that 🔔 in the top bar is on.
+* If the browser is blocking notifications, click the padlock to the left of the address bar and set notifications to **Allow**.
+* No notification appears while you are looking at the webmail window.
+* Mail that lands in Sent, Drafts, Trash or Spam is not announced. Mail filed into another mailbox by a xref:05-settings.adoc#_55-filters[filter] is announced.
+
+**Q. Pictures in a message are missing.**
+Outside pictures are blocked to prevent tracking. If you trust the message, click **Show images** (xref:02-mail-read.adoc#blocked-remote-images[2.6]).
+
+**Q. A message I need is in Spam.**
+Open it and click **Not spam**. It goes back to the Inbox and the sender is removed from your blocked senders.
+
+**Q. Mail from a particular person never arrives.**
+Check whether it is caught by a xref:05-settings.adoc#_57-blocked-senders[blocked senders], xref:05-settings.adoc#_55-filters[filter] or xref:05-settings.adoc#_58-forwarding[forwarding] rule (with Keep a copy turned off).
+
+[[sending-mail]]
+== Sending mail
+
+**Q. It says the attachments are too large.**
+Normal attachments are limited to 30MB and 10 files in total by default. Use **Convert** next to an attachment, or **Convert all to large attachments**. Large attachments can be downloaded for 30 days.
+
+**Q. The message I was writing disappeared.**
+Open a new message with **✎** in the same browser and you will see "You have an unfinished message from …". Click **Continue writing**. Attachments are not restored (xref:03-mail-compose.adoc#_38-auto-save-and-continuing-a-message[3.8]).
+
+**Q. I want to take back a message I sent.**
+If the recipients are on the same mail server and have not read it yet, you can **Recall** it under xref:03-mail-compose.adoc#_39-read-receipts-and-recall[Read receipts]. Mail sent to outside addresses cannot be recalled.
+
+**Q. I cannot tell whether outside recipients read my mail.**
+Outside recipients show as "Not trackable (external)". Tick **Request read receipt** when sending; you get a receipt if the recipient agrees.
+
+**Q. It says "Too many attempts".**
+Sending more than 60 messages a minute blocks sending for a short while. Try again after the time shown.
+
+[[storage]]
+== Storage
+
+**Q. My mailbox is full.**
+
+* Check the usage at the bottom of the side menu.
+* See the size of each mailbox in xref:05-settings.adoc#_54-mailboxes[Mailboxes], delete large messages, then **Empty** the **Trash** (mail left in Trash still counts).
+* Ask your administrator if you need more space.
+
+[[calendar]]
+== Calendar
+
+**Q. An event I changed in Thunderbird does not show in webmail (or the other way round).**
+Thunderbird synchronizes every 30 minutes by default. Synchronize in Thunderbird, or refresh the webmail calendar.
+
+**Q. I cannot change an event.**
+Events in read-only calendars (including network subscriptions) cannot be changed.
+
+[[thunderbird-and-outlook]]
+== Thunderbird and Outlook
+
+**Q. Mail I deleted in my mail app is gone from webmail too.**
+Webmail and the mail app share the same mailbox. Deleting on one side deletes on the other.
+
+**Q. After changing my password, my mail app no longer receives mail.**
+Update the password saved in your mail app (and in any app connected with CalDAV or CardDAV).
+
+**Q. I do not know the server settings for my mail app.**
+Ask your administrator for the IMAP and SMTP server addresses and ports. Calendar and address book connection details can be copied from the xref:04-calendar.adoc#connecting-other-calendar-apps-caldav[CalDAV guide] and the xref:05-settings.adoc#connecting-other-address-book-apps-carddav[CardDAV guide] in webmail.
+
+xref:05-settings.adoc[← 5. Preferences] · xref:README.adoc[Contents]

@@ -1,0 +1,967 @@
+/*
+ * james9Mail 디자인 시스템.
+ *  - 색·반경·그림자·전환을 전부 토큰으로 두고, 컴포넌트는 토큰만 참조한다.
+ *  - 메일 본문(iframe)은 흰 배경 원문을 그대로 보여 주므로 화면은 라이트 테마로 고정한다.
+ */
+:root {
+  /* 면 */
+  --bg: #eef1f6;
+  --bg-grad: radial-gradient(1200px 600px at 12% -10%, #f7f9fc 0%, #eaeef5 55%, #e7ebf3 100%);
+  --panel: #ffffff;
+  --panel-soft: #f8fafc;
+  --panel-sunken: #f4f6fa;
+
+  /* 선 */
+  --border: #e6eaf1;
+  --border-strong: #d7dde8;
+
+  /* 글자 */
+  --text: #151922;
+  --text-2: #444c5c;
+  --muted: #7f879a;
+
+  /* 강조 — 관리자 설정 > 사이트 기본 설정에서 항목별로 고른다 (lib/theme.ts).
+   * 여기 적힌 값이 기본 팔레트이고, 관리자가 고른 색은 lib/theme.ts 가 같은 이름의
+   * 변수를 :root 보다 우선하는 style 속성으로 얹어 덮는다.
+   * --accent-rgb 는 반투명용이다 — 아래 rgb(var(--accent-rgb) / .22) 꼴로만 쓴다. */
+  --accent: #4f46e5;
+  --accent-rgb: 79 70 229;
+  --accent-hover: #4338ca;
+  --accent-text: #3f37c9;
+  --accent-pale: #f4f1fe;
+  --accent-soft: #eef0fe;
+  --accent-soft-2: #e4e7fd;
+  --accent-grad-from: #5b53ea;
+  --accent-grad-to: #7c5cf0;
+  --accent-grad: linear-gradient(135deg, var(--accent-grad-from) 0%, var(--accent-grad-to) 100%);
+  --ring: rgb(var(--accent-rgb) / .22);
+  /* 주소 입력창 문법 강조 (editor.css) */
+  --syntax-field: #4a4ec2;
+
+  /* 상태 */
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warn-bg: #fffbeb;
+  --warn-border: #fde3a7;
+  --warn-text: #92610a;
+  --ok: #059669;
+  --star: #f5b400;
+
+  /* 반경 */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  /* 그림자 */
+  --sh-1: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .05);
+  --sh-2: 0 6px 16px -6px rgba(16, 24, 40, .14), 0 2px 6px -2px rgba(16, 24, 40, .06);
+  --sh-3: 0 24px 56px -20px rgba(16, 24, 40, .32), 0 8px 20px -10px rgba(16, 24, 40, .16);
+  --sh-accent: 0 10px 24px -8px rgb(var(--accent-rgb) / .5);
+  --sh-accent-lg: 0 16px 32px -10px rgb(var(--accent-rgb) / .6);
+
+  /* 목록 헤더 · 읽기 검색 바 공통 높이 (좌우 구분선 정렬) */
+  --head-h: 52px;
+
+  --t: 150ms cubic-bezier(.4, 0, .2, 1);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text',
+    'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg) var(--bg-grad) no-repeat fixed;
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3 { letter-spacing: -.02em; }
+button {
+  font: inherit; cursor: pointer; color: inherit;
+  transition: background var(--t), border-color var(--t), color var(--t), box-shadow var(--t), transform var(--t), filter var(--t);
+}
+button:disabled { cursor: default; opacity: .45; }
+input, select, textarea { font: inherit; color: inherit; transition: border-color var(--t), box-shadow var(--t), background var(--t); }
+input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+a { color: var(--accent-text); text-underline-offset: 2px; }
+a:hover { color: var(--accent-hover); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.date, .size, .usage-text, .stat-num { font-variant-numeric: tabular-nums; }
+
+/* 스크롤바 */
+* { scrollbar-width: thin; scrollbar-color: #cdd4e0 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cfd6e2; border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #b6bfd0; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ───────────────────────────── 공용 컨트롤 */
+.btn, .tb, .menu-btn,
+.reading-toolbar button, .reading-toolbar .btn,
+.search select, .search button,
+.locale-tabs button {
+  display: inline-flex; align-items: center; gap: 6px; justify-content: center;
+  padding: 7px 13px; border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  background: var(--panel); color: var(--text-2); text-decoration: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; line-height: 1.3; box-shadow: var(--sh-1);
+}
+.btn:hover, .tb:hover, .menu-btn:hover,
+.reading-toolbar button:hover:not(:disabled), .reading-toolbar .btn:hover,
+.search button:hover, .locale-tabs button:hover:not(.active) {
+  background: var(--panel-soft); border-color: #c6cfdd; color: var(--text);
+}
+.btn:active, .tb:active, .reading-toolbar button:active:not(:disabled) { transform: translateY(1px); }
+.tb.active, .btn.active { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
+.tb.icon, .btn.icon { padding: 7px 9px; }
+.tb.icon svg, .btn.icon svg { display: block; }
+
+button.primary, .reading-toolbar button.primary {
+  background: var(--accent); background-image: var(--accent-grad); color: #fff; border: 1px solid transparent;
+  padding: 8px 18px; border-radius: var(--r-sm); font-weight: 600; box-shadow: var(--sh-1);
+}
+button.primary:hover:not(:disabled) { filter: saturate(1.08) brightness(1.06); box-shadow: var(--sh-accent); }
+button.primary:active:not(:disabled) { transform: translateY(1px); }
+
+button.link { background: none; border: none; color: var(--accent-text); padding: 4px 8px; border-radius: var(--r-xs); font-weight: 500; }
+button.link:hover:not(:disabled) { background: var(--accent-soft); }
+button.link.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; text-decoration: none; }
+button.link.danger, .danger { color: var(--danger); }
+button.danger:hover:not(:disabled) { background: var(--danger-soft); border-color: #f2b8b8; color: var(--danger); }
+
+input[type=text], input[type=password], input[type=email], input[type=number], input[type=date],
+input[type=datetime-local], input[type=search], input:not([type]), select, textarea {
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 8px 11px;
+}
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: #c6cfdd; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+input:disabled, select:disabled, textarea:disabled { background: var(--panel-sunken); color: var(--muted); }
+::placeholder { color: #a8b0c0; }
+
+.checkbox { flex-direction: row !important; align-items: center; gap: 7px; display: inline-flex; width: auto !important; cursor: pointer; }
+.error { color: var(--danger); font-size: 13px; }
+.info { color: var(--accent-text); font-size: 13px; }
+.warn, .remote-banner, .restore-bar {
+  background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+  padding: 8px 12px; border-radius: var(--r-sm); margin: 8px 0; font-size: 13px;
+}
+.hint { color: var(--muted); font-size: 12px; }
+.tag { padding: 2px 8px; border-radius: var(--r-pill); background: var(--panel-sunken); border: 1px solid var(--border); color: var(--text-2); font-size: 11px; font-weight: 600; }
+.tag.large { background: #fff5d6; border-color: #f5dfa0; color: #8a5d05; }
+
+/* 상단 중앙에서 내려왔다 위로 사라지는 알림 (Toast.tsx) */
+.toast-top {
+  position: fixed; top: 0; left: 50%; z-index: 200;
+  max-width: min(560px, calc(100% - 32px));
+  background: rgba(21, 25, 34, .95); color: #fff; padding: 11px 18px;
+  border-radius: 0 0 var(--r) var(--r);
+  font-size: 13px; font-weight: 500; text-align: center;
+  box-shadow: var(--sh-3); backdrop-filter: blur(6px);
+  animation: toast-drop 220ms cubic-bezier(.2, .9, .3, 1) both;
+}
+.toast-top.error { background: rgba(185, 28, 28, .96); }
+.toast-top.leaving { animation: toast-lift 220ms ease-in both; }
+@keyframes toast-drop {
+  from { opacity: 0; transform: translate(-50%, -110%); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toast-lift {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, -110%); }
+}
+
+.boot { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); }
+
+/* ───────────────────────────── 로그인 */
+.login-wrap { display: flex; align-items: center; justify-content: center; height: 100%; padding: 24px; }
+.login-card {
+  background: var(--panel); padding: 36px 32px 30px; border-radius: var(--r-xl); width: 360px; max-width: 100%;
+  box-shadow: var(--sh-3); display: flex; flex-direction: column; gap: 14px;
+  animation: card-in 320ms cubic-bezier(.2, .9, .3, 1);
+}
+@keyframes card-in { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+.login-card h1 {
+  margin: 0 0 4px; text-align: center; font-size: 22px; font-weight: 700; color: var(--text);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.login-card h1::before {
+  content: '✉'; width: 52px; height: 52px; border-radius: var(--r-lg); background-image: var(--accent-grad);
+  color: #fff; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: var(--sh-accent);
+}
+.login-card label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.login-card input[type=text], .login-card input[type=password], .login-card input:not([type]) { padding: 10px 12px; }
+.login-card .checkbox { font-weight: 500; color: var(--text-2); font-size: 13px; }
+.login-card button.primary { margin-top: 6px; padding: 11px; font-size: 14px; }
+.locale-tabs { display: flex; gap: 4px; padding: 3px; background: var(--panel-sunken); border-radius: var(--r); }
+.locale-tabs button { flex: 1; border: none; background: none; box-shadow: none; padding: 7px; border-radius: 7px; }
+.locale-tabs button.active { background: var(--panel); color: var(--accent-text); font-weight: 700; box-shadow: var(--sh-1); }
+
+/* ───────────────────────────── 셸 */
+.app { display: flex; flex-direction: column; height: 100%; }
+.topbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 18px; background: rgba(255, 255, 255, .82); backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom: 1px solid var(--border); z-index: 10;
+}
+.brand-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar .brand {
+  font-weight: 800; font-size: 17px; letter-spacing: -.03em; border: none; padding: 2px 4px;
+  background: none; background-image: var(--accent-grad);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.topbar .brand:hover { filter: brightness(1.12); }
+.topbar .logo { height: 28px; max-width: 120px; object-fit: contain; }
+.burger {
+  font-size: 19px; line-height: 1; width: 32px; height: 32px; color: var(--text-2) !important;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.burger:hover { background: var(--panel-sunken) !important; }
+.top-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.top-actions .who {
+  color: var(--text-2); font-weight: 600; font-size: 13px; padding: 5px 12px;
+  background: var(--panel-sunken); border: 1px solid var(--border); border-radius: var(--r-pill);
+}
+/* 새 메일 알림 토글 (8-2). 꺼진 상태는 흐리게 — 종에 그은 빗금만으로는 켜짐/꺼짐이 잘 구분되지 않는다 */
+.top-actions button.bell { opacity: .5; }
+.top-actions button.bell.on { opacity: 1; }
+/* 아이콘만 있는 버튼 (알림 종 · 설정 톱니) */
+.top-actions button.bell,
+.top-actions button.gear { display: inline-flex; align-items: center; line-height: 1; padding: 5px 7px; }
+
+.top-actions .me-photo { width: 26px; height: 26px; border-radius: var(--r-pill); object-fit: cover; border: 1px solid var(--border); }
+
+.body { display: flex; flex: 1; min-height: 0; }
+
+/* ───────────────────────────── 사이드바 */
+.sidebar {
+  width: 244px; flex-shrink: 0; background: linear-gradient(180deg, #fbfcfe 0%, #f6f8fc 100%);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 12px 10px;
+}
+.sidebar-hidden .sidebar { display: none; }
+.sidebar nav { flex: 1; overflow-y: auto; }
+.tree, .subtree { list-style: none; margin: 0; padding: 0; }
+.subtree { padding-left: 12px; position: relative; }
+.subtree::before { content: ''; position: absolute; left: 5px; top: 2px; bottom: 2px; width: 1px; background: var(--border-strong); }
+.mbox-row { display: flex; align-items: center; border-radius: var(--r-sm); position: relative; }
+.mbox-row:hover { background: rgb(var(--accent-rgb) / .06); }
+.mbox-row.drop-over { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.mbox {
+  display: flex; flex: 1; min-width: 0; border: none; background: none; text-align: left; padding: 8px 10px;
+  border-radius: var(--r-sm); justify-content: space-between; gap: 8px; align-items: center;
+  color: var(--text-2); font-weight: 500; font-size: 13.5px; position: relative;
+}
+.mbox.all { width: 100%; margin-bottom: 4px; }
+.mbox:hover { color: var(--text); }
+.mbox.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
+.mbox.active::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0; background-image: var(--accent-grad);
+}
+.mbox .mbox-icon { flex-shrink: 0; opacity: .75; }
+.mbox.active .mbox-icon { opacity: 1; }
+.mbox .mbox-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbox .unseen {
+  flex-shrink: 0; min-width: 20px; padding: 1px 7px; border-radius: var(--r-pill);
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.mbox-more { border: none; background: none; color: var(--muted); padding: 2px 8px; visibility: hidden; border-radius: var(--r-xs); font-size: 15px; }
+.mbox-more:hover { background: rgba(0, 0, 0, .05); color: var(--text); }
+.mbox-row:hover .mbox-more, .mbox-menu.open .mbox-more { visibility: visible; }
+.usage { border-top: 1px solid var(--border); padding: 12px 8px 4px; margin-top: 10px; }
+.usage-bar { height: 6px; background: #e3e8f0; border-radius: var(--r-pill); overflow: hidden; }
+.usage-bar span { display: block; height: 100%; border-radius: var(--r-pill); background-image: var(--accent-grad); transition: width 400ms var(--t); }
+.usage-text { font-size: 11.5px; color: var(--muted); margin: 6px 0 8px; font-weight: 500; }
+.usage button.link { padding: 4px 0; font-size: 12.5px; }
+
+/* ───────────────────────────── 드롭다운 */
+.menu { position: relative; display: inline-block; }
+.menu-list {
+  position: fixed; margin: 0; padding: 6px; list-style: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-3);
+  min-width: 176px; z-index: 150; /* 모달(100) 위, 토스트(200) 아래 */ animation: pop 130ms ease-out;
+}
+@keyframes pop { from { opacity: 0; transform: translateY(-4px); } }
+.menu-list li button {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  padding: 8px 11px; border-radius: var(--r-xs); white-space: nowrap; font-size: 13px; color: var(--text-2);
+}
+/* 정렬 메뉴처럼 지금 고른 항목에 ✓ 를 붙이는 자리. 빈 칸도 폭을 잡아 글자가 밀리지 않는다 */
+.menu-list li button .menu-mark { display: inline-block; width: 13px; color: var(--accent-text); font-weight: 700; }
+.menu-list li button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-text); }
+.menu-list li button.danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+
+/* ───────────────────────────── 목록 */
+/* 너비는 Splitter 가 .body 에 심는 --list-w 다. 변수가 없으면(관리자 화면 등) 420px */
+.list-pane { position: relative; width: var(--list-w, 420px); flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--panel); min-width: 0; }
+
+/* 목록 ↔ 읽기 영역 손잡이. 보이는 선은 1px 이지만 집히는 폭은 5px 다 — 1px 을 조준하게 하면
+   폭을 바꾸려다 메일을 열게 된다. 목록 쪽 테두리와 겹치게 음수 마진으로 올려 둔다 */
+.splitter {
+  flex: none; width: 5px; margin-left: -5px; z-index: 2; cursor: col-resize; touch-action: none;
+  background: none; transition: background var(--t);
+}
+.splitter:hover, .splitter.dragging { background: var(--accent-soft-2); }
+/* 끌고 있는 동안에는 지나가는 글자가 잡히지 않게 한다 */
+.splitter.dragging { user-select: none; }
+.splitter.dragging ~ * { user-select: none; }
+.mailbox-header { display: flex; align-items: center; gap: 8px; padding: 8px 16px; min-height: var(--head-h); flex-wrap: wrap; }
+.mailbox-header strong { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.mailbox-header .unseen {
+  padding: 1px 8px; border-radius: var(--r-pill); background: var(--accent-soft);
+  color: var(--accent-text); font-size: 11.5px; font-weight: 700;
+}
+.mailbox-header .search-narrow { display: none; margin-left: auto; }
+.list-header {
+  display: flex; align-items: center; padding: 7px 16px; gap: 8px; flex-wrap: wrap;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--panel-soft);
+}
+.filter-wrap { position: relative; }
+.filters {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 12px 14px;
+  box-shadow: var(--sh-3); font-size: 13px; white-space: nowrap; animation: pop 130ms ease-out;
+}
+.search { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.search input { padding: 6px 12px; width: 148px; border-radius: var(--r-pill); }
+.search select, .search button { padding: 6px 11px; border-radius: var(--r-pill); }
+
+.list { flex: 1; overflow-y: auto; }
+.row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  position: absolute; left: 0; right: 0; cursor: pointer; border-bottom: 1px solid #f1f3f8;
+  transition: background var(--t);
+}
+.row::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0;
+  background-image: var(--accent-grad); opacity: 0;
+}
+.row:hover { background: var(--panel-soft); }
+.row.unseen:not(.active) { background: linear-gradient(90deg, rgb(var(--accent-rgb) / .045), transparent 45%); }
+.row.unseen:not(.active):hover { background: var(--panel-soft); }
+.row.active { background: var(--accent-soft); }
+.row.active::before { opacity: 1; }
+.row.unseen .row-subject { font-weight: 700; color: var(--text); }
+.row.unseen .row-top .who { color: var(--text); font-weight: 700; }
+.row > input[type=checkbox] { flex-shrink: 0; }
+.row .avatar {
+  width: 36px; height: 36px; border-radius: var(--r-pill); background: var(--accent-soft-2); color: var(--accent-text);
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 14px;
+}
+.row .avatar.photo { object-fit: cover; background: var(--panel-sunken); border: 1px solid var(--border); }
+.row.unseen .avatar:not(.photo) { background: var(--accent); background-image: var(--accent-grad); color: #fff; }
+.row .star { border: none; background: none; color: #d3d8e2; padding: 0 5px 0 0; font-size: 14px; line-height: 1; }
+.row .star:hover { color: var(--star); }
+.row .star.on { color: var(--star); }
+/* 보낸 사람이 선언한 중요도. 별표와 헷갈리지 않게 색·모양을 따로 둔다 */
+.row .prio { margin-right: 5px; font-weight: 700; color: var(--danger); }
+.row .clip { margin-right: 5px; font-size: 11px; opacity: .65; }
+.row-main { flex: 1; min-width: 0; }
+.row-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); gap: 8px; align-items: baseline; }
+.row-top .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text-2); }
+.row-top .date { flex-shrink: 0; font-size: 11.5px; }
+.row-subject { margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+
+/* 대화로 묶기 (2-2). 접힌 대표행의 삼각형과 통수 배지, 펼친 자식 행의 들여쓰기 */
+/* 삼각형은 목록에서 유일하게 "눌러서 펴는" 것이라 눈에 들어와야 한다. 작으면 조준도 안 된다 */
+.row .thread-toggle {
+  flex-shrink: 0; width: 22px; height: 22px; border: none; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs);
+  color: var(--muted); font-size: 20px; line-height: 1; padding: 0;
+  transition: transform .14s ease, background var(--t), color var(--t);
+}
+/* 삼각형이 없는 줄의 자리맞춤 */
+.row .thread-toggle.empty { cursor: default; }
+.row .thread-toggle:hover { color: var(--text); background: var(--accent-soft); }
+/* 펼친 동안은 90도 눕는다 — 누르면 아래가 열린다는 것을 모양으로 말한다 */
+.row .thread-toggle.open { transform: rotate(90deg); color: var(--accent-text); }
+.row-top .thread-count {
+  flex-shrink: 0; font-size: 12px; line-height: 1.6; padding: 0 7px; border-radius: 9px;
+  background: var(--panel-sunken); color: var(--muted); border: 1px solid var(--border);
+}
+/* 안 읽은 메일이 남은 대화는 수를 강조한다 — 대표행만 읽어도 배지는 남아 있어야 한다 */
+.row-top button.thread-count:hover { background: var(--accent); color: #fff; border-color: transparent; }
+.row-top .thread-count.has-unseen { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 700; }
+/* 펼친 대화의 아래 줄. 들여쓰기는 **체크박스 다음부터** 다 — 체크박스가 줄마다 어긋나면
+   여러 통 고르려고 세로로 훑을 때 조준이 안 된다. 그래서 행을 밀지 않고 빈 삼각형 자리를 넓힌다 */
+.row.thread-child .thread-toggle.empty { width: 42px; }
+.row.thread-child .row-top .who { font-weight: 500; }
+/* 대표행은 안 눌렸지만 대화 안에 별표가 있을 때. 켜진 별과 구분되는 옅은 색이다 */
+.row .star.in-thread { color: var(--star); opacity: .4; }
+/* 오프라인 읽기 표시 (8-5). 목록을 따라 스크롤하지 않고 머리에 붙어 있어야 눈에 남는다 */
+.offline-note {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-border); color: var(--warn-text);
+  padding: 7px 12px; font-size: 12px; text-align: center;
+}
+.list-status, .more { padding: 18px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+.list-status.error { color: var(--danger); }
+.more { width: 100%; border: none; background: none; color: var(--accent-text); font-weight: 600; border-radius: var(--r-sm); }
+.more:hover { background: var(--accent-soft); }
+
+/* ───────────────────────────── 읽기 */
+.read-pane {
+  flex: 1; min-width: 0; position: relative; background: var(--panel-sunken);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.read-search {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+  /* 테두리 1px 을 더해 왼쪽 .list-header 의 border-top 과 같은 높이에 선이 오게 한다 */
+  min-height: calc(var(--head-h) + 1px);
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.read-search .search { margin-left: auto; }
+.read-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.read-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: 10px; padding: 24px; text-align: center; }
+.read-empty::before {
+  content: '✉'; font-size: 30px; width: 68px; height: 68px; border-radius: var(--r-xl);
+  background: var(--panel); color: #c4cada; display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--sh-1); border: 1px solid var(--border); margin-bottom: 4px;
+}
+.read-hint { font-size: 12.5px; color: var(--muted); }
+.back-to-list { display: none; margin: 0; }
+.reading {
+  flex: 1; padding: 20px 26px 32px; margin: 12px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-1);
+  display: flex; flex-direction: column;
+}
+/* 본문 iframe 은 남은 세로 공간을 모두 차지하고, 본문이 더 길면 바깥(.read-scroll)이 스크롤된다 */
+.body-frame { flex: 1; display: flex; flex-direction: column; }
+.reading-toolbar {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  padding-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.reading-subject { margin: 14px 0 12px; font-size: 20px; font-weight: 700; line-height: 1.35; }
+.reading-meta {
+  font-size: 13px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px;
+  background: var(--panel-soft); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px;
+}
+.reading-meta-row { display: flex; align-items: baseline; gap: 12px; }
+.reading-meta-row .meta-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reading-meta-row .meta-date { margin-left: auto; flex: none; white-space: nowrap; }
+.reading-status { color: var(--muted); padding: 16px 0; }
+/* 관리자 메일 읽기 팝업 (ADM-5): 헤더 아래 본문 iframe 을 구분선으로 떼어 놓는다 */
+.modal.mail-view .body-frame { margin-top: 12px; border-top: 1px solid var(--border); }
+
+/* 원문보기 팝업 (5-2): 줄바꿈을 유지하되 긴 줄은 접어 가로 스크롤을 막는다 */
+.mail-source {
+  margin: 0; font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-all; max-height: 62vh; overflow: auto;
+  background: var(--panel-soft); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px;
+}
+.attachments { margin: 14px 0; padding: 12px 14px; background: var(--panel-soft); border: 1px solid var(--border); border-radius: var(--r); }
+.attachments strong { font-size: 13px; }
+.attachments ul { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.attachments li {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 7px 11px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-xs);
+}
+.attachments li::before { content: '📎'; font-size: 11px; opacity: .7; }
+.attachments li > a:first-of-type { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachments .size { color: var(--muted); margin-left: auto; font-size: 12px; flex-shrink: 0; }
+.attachments .link { font-size: 12px; flex-shrink: 0; }
+.remote-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.calendar-box {
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--accent-pale) 100%); border: 1px solid var(--accent-soft-2);
+  padding: 12px 14px; border-radius: var(--r); margin: 12px 0; display: flex; gap: 12px; align-items: center;
+  flex-wrap: wrap; font-size: 13px; color: var(--text-2);
+}
+.calendar-box strong { color: var(--accent-text); }
+/* 일시 · 장소 · 내용. 라벨 폭을 고정해 값이 한 줄에 맞춰 떨어지게 한다 */
+.cal-fields { flex: 1 1 260px; margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; min-width: 0; }
+/* 줄 묶음은 표시에서 빼 dt·dd 가 바로 grid 에 놓이게 한다 — 라벨 폭이 줄마다 어긋나지 않는다 */
+.cal-fields > div { display: contents; }
+.cal-fields dt { color: var(--accent-text); font-weight: 600; }
+/* 내용은 줄바꿈을 살려서 보여 준다 (ICS 의 \n) */
+.cal-fields dd { margin: 0; min-width: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+.cal-actions { display: flex; gap: 6px; }
+.cal-actions button {
+  padding: 5px 14px; border: 1px solid var(--accent); background: var(--panel); color: var(--accent-text);
+  border-radius: var(--r-pill); font-size: 13px; font-weight: 600;
+}
+.cal-actions button:hover { background: var(--accent); color: #fff; }
+.cal-done { font-weight: 600; color: var(--ok); }
+/* 내가 보낸 메일 — 보낸 사람 줄 옆 [수신 확인] 과 그 창의 약속 응답 (features/receipts/Receipts.tsx) */
+.reading-meta .att-open { margin-left: 10px; padding: 1px 10px; font-size: 12px; }
+.att-accept { color: var(--ok); font-weight: 600; }
+.att-tentative { color: var(--warn-text); font-weight: 600; }
+.att-decline { color: var(--danger); font-weight: 600; }
+
+/* ── 수신확인 요청 상자 (features/message/ReadingPane.tsx) — 수신자 정보 바로 아래 (feature-gap 4-4).
+      약속 상자와 달리 눈에 덜 띄는 색을 쓴다. 답을 재촉하는 자리가 아니라 고를 자리다 */
+.mdn-box {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0 0;
+  padding: 9px 12px; font-size: 13px; color: var(--text-2);
+  background: var(--panel-soft); border: 1px solid var(--border); border-radius: var(--r);
+}
+.mdn-ask { flex: 1 1 260px; min-width: 0; }
+.mdn-box button { flex: none; padding: 4px 14px; font-size: 13px; }
+.mdn-done { color: var(--ok); font-weight: 600; }
+
+/* ── v-Card 연락처 상자 (features/message/VCardBox.tsx) — .vcf 첨부 대신 내용을 펼친다 */
+.vcards { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.vcard-box {
+  display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; font-size: 13px;
+  background: var(--panel-soft); border: 1px solid var(--border); border-radius: var(--r);
+}
+.vcard-photo { width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--r-xs); object-fit: cover; }
+.vcard-main { flex: 1; min-width: 0; }
+.vcard-head { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.vcard-name { font-weight: 600; font-size: 14px; color: var(--text); }
+/* 이름 · 항목 라벨 폭을 고정해 값이 한 줄에 맞춰 떨어지게 한다 (약속 상자와 같은 얼개) */
+.vcard-fields { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; min-width: 0; }
+.vcard-fields > div { display: contents; }
+.vcard-fields dt { color: var(--muted); font-weight: 600; }
+.vcard-fields dd { margin: 0; min-width: 0; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+
+/* ── 대화 내용 보기 (features/message/ConversationPane.tsx) — 통수 배지를 눌러 들어온다.
+      메신저 얼개다: 사진 · 이름 · 보낸 날짜가 한 줄이고 말은 말풍선에 담긴다 */
+/* 메신저처럼 — 오래된 것이 위, 최근이 아래다. 남이 보낸 메일은 왼쪽, 내가 보낸 메일은
+   오른쪽에 선다 (ConversationPane.tsx 의 own). 줄 전체를 한쪽으로 붙여 두 사람의 말이
+   가운데에서 갈라지게 한다. 내 말에는 사진이 없다 — 오른쪽에 선 것이 이미 나라는 표시다 */
+.chat { display: flex; flex-direction: column; gap: 14px; margin-top: 2px; }
+.chat-row { display: flex; gap: 10px; align-items: flex-start; max-width: 88%; }
+/* 기본이 남이 보낸 메일이다 — 사진이 왼쪽 끝에 서고 말풍선이 그 오른쪽에 붙는다 */
+.chat-row { margin-right: auto; }
+.chat-row.own { flex-direction: row-reverse; margin-left: auto; margin-right: 0; }
+.chat-row .avatar {
+  width: 34px; height: 34px; border-radius: var(--r-pill); background: var(--accent-soft-2); color: var(--accent-text);
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 13px;
+}
+.chat-row .avatar.photo { object-fit: cover; background: var(--panel-sunken); border: 1px solid var(--border); }
+.chat-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; align-items: flex-start; }
+.chat-row.own .chat-main { align-items: flex-end; }
+/* 이름과 시각. 줄이 선 쪽(바깥)에 이름이 붙어야 누구 말인지 바로 읽힌다 */
+.chat-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.chat-row.own .chat-head { flex-direction: row-reverse; }
+/* 말풍선. 꼬리는 두 겹이다 — 바깥 삼각형이 테두리, 안쪽이 배경 */
+.chat-bubble {
+  position: relative; padding: 9px 13px; border-radius: 14px; min-width: 0;
+  background: var(--panel-soft); border: 1px solid var(--border);
+}
+.chat-row.own .chat-bubble { background: var(--accent-pale); border-color: var(--accent-soft-2); }
+.chat-bubble::before, .chat-bubble::after {
+  content: ''; position: absolute; top: 11px; width: 0; height: 0; border: 7px solid transparent;
+}
+.chat-row:not(.own) .chat-bubble::after { left: -14px; border-right-color: var(--border); }
+.chat-row:not(.own) .chat-bubble::before { left: -12px; border-right-color: var(--panel-soft); z-index: 1; }
+.chat-row.own .chat-bubble::after { right: -14px; border-left-color: var(--accent-soft-2); }
+.chat-row.own .chat-bubble::before { right: -12px; border-left-color: var(--accent-pale); z-index: 1; }
+.conv-who { font-weight: 600; font-size: 13px; color: var(--text); min-width: 0; word-break: break-all; }
+.conv-when { flex: none; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 인용문에서 긁어 온 시각. 헤더에서 읽은 정확한 시각과 구분한다 — 시간대가 없는 값이다.
+   기울임만 남긴다. 기호를 붙여 두면 그것이 무엇인지 설명할 자리가 다시 필요해진다 */
+.conv-when.quoted { font-style: italic; }
+.conv-body { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.conv-body.empty { color: var(--muted); font-style: italic; }
+/* 잘라서 보여 주는 본문. 가리키면 전문이 풍선으로 뜬다는 것을 커서로 알린다 */
+.conv-body.clipped { cursor: help; }
+
+.fab {
+  position: absolute; right: 30px; bottom: 30px; width: 58px; height: 58px; border-radius: var(--r-pill); border: none;
+  background-image: var(--accent-grad); color: #fff; font-size: 24px; box-shadow: var(--sh-accent); z-index: 30;
+}
+.fab:hover { transform: translateY(-2px) scale(1.04); box-shadow: var(--sh-accent-lg); }
+.fab:active { transform: translateY(0) scale(.98); }
+
+/* ───────────────────────────── 모달 · 쓰기 */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(17, 22, 32, .45); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  animation: fade 160ms ease-out;
+}
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  background: var(--panel); border-radius: var(--r-xl); width: min(760px, 94vw); max-width: 94vw; max-height: 92vh;
+  display: flex; flex-direction: column; overflow: hidden; position: relative; box-shadow: var(--sh-3);
+  animation: card-in 200ms cubic-bezier(.2, .9, .3, 1);
+}
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center; padding: 14px 18px;
+  border-bottom: 1px solid var(--border); cursor: move; user-select: none; background: var(--panel-soft);
+}
+.modal-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.modal-head .x {
+  border: none; background: none; font-size: 16px; cursor: pointer; color: var(--muted);
+  width: 30px; height: 30px; border-radius: var(--r-xs); display: inline-flex; align-items: center; justify-content: center;
+}
+.modal-head .x:hover { background: rgba(0, 0, 0, .06); color: var(--text); }
+.modal-content { padding: 18px; overflow-y: auto; }
+.compose-body { padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.field { display: flex; align-items: center; gap: 10px; }
+.field > span:first-child, .field-label { width: 84px; flex-shrink: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.field input { flex: 1; min-width: 0; }
+.field-static { flex: 1; padding: 7px 0; color: var(--text-2); }
+/* 보내는사람 선택. 알리아스가 있는 계정에만 뜬다 (feature-gap 4-3) */
+.field .from-select { flex: 0 1 auto; max-width: 100%; min-width: 0; }
+/* 라벨 옆에 붙는 참조·숨은참조 열기 버튼 */
+.field > span.field-label-add { display: inline-flex; align-items: center; gap: 9px; }
+.field-add {
+  flex-shrink: 0; width: 14px; height: 16px; padding: 0; border: none; box-shadow: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.field-add:hover { color: var(--accent-text); }
+
+/* 수신자 블럭(칩) 입력 */
+.chips {
+  position: relative;
+  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  padding: 4px 6px; min-height: 37px; cursor: text;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.chips:hover { border-color: #c6cfdd; }
+.chips:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.chips.dnd { border-style: dashed; border-color: var(--accent); }
+.chip {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%;
+  background: var(--accent-soft); border: 1px solid var(--accent-soft-2); border-radius: var(--r-pill);
+  padding: 2px 4px 2px 10px; font-size: 12.5px; line-height: 1.6; color: var(--accent-text);
+  cursor: grab; user-select: none;
+}
+.chip:hover { background: var(--accent-soft-2); }
+.chip:focus { outline: none; border-color: var(--accent); background: var(--accent); color: #fff; box-shadow: var(--sh-1); }
+.chip:focus .chip-x { color: rgba(255, 255, 255, .8); }
+.chip.invalid { background: var(--danger-soft); border-color: #f2b8b8; color: var(--danger); }
+.chip.invalid:focus { background: var(--danger); border-color: var(--danger); color: #fff; }
+.chip.moving { opacity: .4; }
+.chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-x {
+  border: none; background: none; padding: 0; width: 17px; height: 17px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-pill); font-size: 10px; color: inherit; opacity: .65;
+}
+.chip-x:hover { background: rgba(0, 0, 0, .14); opacity: 1; }
+.chip-caret { width: 2px; align-self: stretch; margin: 2px 0; border-radius: 2px; background: var(--accent); }
+.chips .chip-input {
+  flex: 1 1 140px; min-width: 80px; border: none; background: none; padding: 3px 4px; box-shadow: none;
+}
+.chips .chip-input:focus { outline: none; border: none; box-shadow: none; }
+
+/* 수신자 자동완성 후보 */
+.suggest {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 232px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  box-shadow: var(--sh-2);
+}
+.suggest-item {
+  display: flex; align-items: baseline; gap: 6px; padding: 6px 8px;
+  border-radius: var(--r-sm); font-size: 13px; cursor: pointer;
+}
+.suggest-item.on { background: var(--accent-soft); color: var(--accent-text); }
+.suggest-name { font-weight: 600; flex-shrink: 0; }
+.suggest-addr { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest-item.on .suggest-addr { color: var(--accent-text); }
+
+.appointment-line {
+  display: flex; align-items: center; gap: 8px; background: var(--accent-soft); border: 1px solid var(--accent-soft-2);
+  padding: 7px 12px; border-radius: var(--r-sm); font-size: 13px; margin-left: 94px; color: var(--accent-text);
+}
+.editor {
+  width: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 12px 14px;
+  font-family: inherit; resize: vertical; line-height: 1.7;
+}
+.attach-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; flex-wrap: wrap; }
+.attach-panel { margin-left: 94px; border: 1px dashed var(--border-strong); border-radius: var(--r); padding: 10px 12px; background: var(--panel-soft); }
+/* 자동 저장 초안 복원 안내 (Compose.tsx) */
+.restore-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; }
+.restore-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.autosave { margin-right: auto; align-self: center; font-size: 12px; color: var(--muted); }
+.autosave.warn-text { color: var(--warn-text); }
+.attach-usage { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.attach-list { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; }
+.attach-list li { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.attach-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-list .size { color: var(--muted); font-size: 12px; }
+.compose-options { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--text-2); }
+.compose-options select { padding: 5px 9px; margin-left: 6px; }
+.modal-actions { display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); justify-content: flex-end; background: var(--panel-soft); }
+.modal-actions.left { justify-content: flex-start; border-top: none; padding: 8px 0; background: none; }
+.modal.dragging::after { content: ''; position: absolute; inset: 0; border: 2px dashed var(--accent); border-radius: var(--r-xl); pointer-events: none; }
+.drop-hint {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background-image: var(--accent-grad);
+  color: #fff; padding: 11px 18px; border-radius: var(--r); pointer-events: none; box-shadow: var(--sh-accent); font-weight: 600;
+}
+.send-confirm { width: min(420px, 92vw); padding: 22px; }
+
+/* ───────────────────────────── 주소 선택 · 주소록 */
+.picker-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+.picker-list li button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 12px; border-radius: var(--r-xs); color: var(--text-2); font-size: 13px; }
+.picker-list li button:hover { background: var(--accent-soft); color: var(--accent-text); }
+.picker-list li button.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
+.picker-list.boxed { border: 1px solid var(--border); border-radius: var(--r); padding: 8px; max-height: 210px; display: flex; flex-direction: column; gap: 2px; margin: 8px 0; background: var(--panel-soft); }
+.transfer { display: flex; align-items: stretch; gap: 8px; margin: 8px 0; }
+.transfer > .picker-list.boxed { flex: 1 1 0; min-width: 0; margin: 0; min-height: 150px; overflow-y: auto; }
+.transfer .checkbox { align-items: flex-start; }
+.transfer-actions { display: flex; flex-direction: column; justify-content: center; gap: 6px; flex-shrink: 0; }
+.transfer-actions .tb { min-width: 34px; font-weight: 700; }
+.form-row.nowrap { flex-wrap: nowrap; }
+
+/* ADM-2 강조색 고르기 */
+.color-pick { display: inline-flex; align-items: center; gap: 6px; }
+.color-pick input[type=color] {
+  width: 34px; height: 28px; padding: 2px; cursor: pointer;
+  border: 1px solid var(--border-strong); border-radius: var(--r-xs); background: var(--panel);
+}
+.color-pick input.hex {
+  width: 92px; padding: 5px 8px; font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.theme-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 8px 14px; margin: 10px 0 14px;
+  padding: 12px 14px; background: var(--panel-sunken);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.theme-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.theme-item-name { color: var(--text-2); font-size: 12.5px; }
+.theme-preview { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.theme-swatch {
+  width: 34px; height: 28px; border-radius: var(--r-xs); border: 1px solid var(--border-strong);
+}
+.theme-swatch.grad { background-image: var(--accent-grad); border-color: transparent; }
+.theme-swatch.soft { background: var(--accent-soft); border-color: var(--accent-soft-2); }
+.theme-swatch.ring { background: var(--panel); box-shadow: 0 0 0 3px var(--ring); }
+
+@media (max-width: 720px) {
+  .theme-grid { grid-template-columns: 1fr; }
+}
+.ab-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.ab-edit { display: flex; gap: 6px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+.ab-list { max-height: 50vh; overflow-y: auto; }
+.ab-badge {
+  display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 11px; font-weight: 700; vertical-align: 1px;
+}
+.addressbook-tab .toolbar a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.addressbook-tab .toolbar .search { display: flex; gap: 6px; align-items: center; }
+
+/* 연락처 · 그룹 편집 (개인 환경설정 > 주소록) */
+.contact-editor .modal-content { max-height: 70vh; }
+.ce-form .form-row input:not([type=checkbox]):not([type=radio]) { flex: 1; min-width: 120px; }
+.ce-form .form-row input.ce-short { flex: 0 0 140px; }
+.ce-form .inline-label { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.ce-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.ce-photo {
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  display: grid; place-items: center; background: var(--panel-soft); border: 1px solid var(--border);
+  font-size: 24px; font-weight: 700; color: var(--muted);
+}
+.ce-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ce-photo-actions { display: flex; gap: 10px; }
+.ce-list { align-items: flex-start; }
+.ce-list > label:first-child { padding-top: 6px; }
+.ce-items { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; align-items: flex-start; }
+.ce-item { display: flex; gap: 6px; align-items: center; width: 100%; flex-wrap: wrap; }
+.ce-item input { flex: 1; min-width: 100px; }
+.ce-address { display: flex; flex-direction: column; gap: 4px; width: 100%; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+.modal-actions .ce-delete { margin-right: auto; }
+.ge-search { position: relative; flex: 1; min-width: 220px; }
+.ge-search input { width: 100%; }
+.ge-title { margin: 14px 0 6px; font-size: 13px; }
+.ge-remove { text-align: right; width: 1%; white-space: nowrap; }
+
+/* ───────────────────────────── 환경설정 · 관리 */
+.settings-body { display: flex; flex: 1; min-height: 0; }
+.sidebar-hidden .settings-nav { display: none; } /* 관리자 화면 LNB: 햄버거(≡)로 접기 */
+.settings-nav {
+  width: 232px; flex-shrink: 0; background: linear-gradient(180deg, #fbfcfe 0%, #f6f8fc 100%);
+  border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.settings-nav button { text-align: left; border: none; background: none; padding: 9px 12px; border-radius: var(--r-sm); color: var(--text-2); font-size: 13.5px; font-weight: 500; }
+.settings-nav button:hover { background: rgb(var(--accent-rgb) / .06); color: var(--text); }
+.settings-nav button.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
+.settings-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.settings-tabs { display: flex; gap: 4px; padding: 10px 24px 0; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; }
+.settings-tabs button {
+  border: none; background: none; padding: 9px 14px 11px; white-space: nowrap; color: var(--muted);
+  font-size: 13.5px; font-weight: 600; position: relative; border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+.settings-tabs button:hover { color: var(--text-2); background: var(--panel-soft); }
+.settings-tabs button.active { color: var(--accent-text); background: none; }
+.settings-tabs button.active::after {
+  content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0; background-image: var(--accent-grad);
+}
+.settings-content { flex: 1; overflow-y: auto; padding: 24px 28px 40px; }
+.tab { max-width: 940px; }
+.tab.tab-wide { max-width: none; }
+.tab h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
+.tab h3 { font-size: 14.5px; font-weight: 700; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+.toolbar .search { margin-right: auto; }
+/* 개인환경설정 탭들(개인정보·서명 제외)의 버튼은 오른쪽에 모은다 */
+.toolbar.right { justify-content: flex-end; }
+.toolbar.right > :not(button):first-child { margin-right: auto; }
+.tab-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 12px 0; }
+.form-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+.form-row > label:first-child { width: 150px; color: var(--muted); flex-shrink: 0; font-size: 12.5px; font-weight: 600; }
+.form-row textarea { flex: 1; min-width: 220px; }
+.form-row input.inline-date { padding: 4px 8px; font-size: 13px; font-weight: 400; margin-left: 8px; }
+input.wide { width: 100%; }
+.logo-preview { max-height: 60px; max-width: 240px; border: 1px solid var(--border); padding: 6px; border-radius: var(--r-sm); background: var(--panel); }
+.photo-edit { display: flex; gap: 12px; align-items: flex-start; }
+.photo-preview {
+  width: 84px; height: 84px; border-radius: var(--r-pill); object-fit: cover;
+  border: 1px solid var(--border); background: var(--panel-soft); flex-shrink: 0;
+}
+.photo-preview.empty {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft-2); color: var(--accent-text); font-weight: 700; font-size: 30px;
+}
+.photo-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 320px; }
+.photo-buttons .hint { flex-basis: 100%; margin: 2px 0 0; }
+.local-cache { display: flex; flex-direction: column; gap: 4px; }
+.local-cache .hint { margin: 0; }
+.hint.warn { color: var(--danger, #b42318); }
+
+/* 캘린더 설정 > 일반 > 외부에서 일정 관리 (calendar/CaldavSection.tsx) */
+.cal-caldav { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--border); }
+.cal-caldav .form-row > label:first-child { width: auto; min-width: 96px; color: var(--text-2); font-size: 13px; font-weight: 400; }
+.caldav-open { align-self: flex-start; padding: 0; }
+.caldav-guide { font-size: 13px; line-height: 1.55; }
+.caldav-guide > p:first-child { margin-top: 0; }
+.caldav-guide p { margin: 0 0 8px; }
+.caldav-guide h4 { margin: 14px 0 6px; font-size: 13px; }
+.caldav-guide ol, .caldav-guide ul { margin: 0; padding-left: 20px; }
+.caldav-guide li { margin: 2px 0; }
+.caldav-guide dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; align-items: center; margin: 8px 0; }
+.caldav-guide dt { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.caldav-guide dd { margin: 0; min-width: 0; }
+.caldav-copy { display: flex; gap: 6px; min-width: 0; }
+.caldav-copy input { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.caldav-calendars { list-style: none; padding: 0 !important; }
+.caldav-calendars li { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.caldav-name { display: inline-flex; align-items: center; gap: 6px; }
+.caldav-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.grid {
+  width: 100%; border-collapse: separate; border-spacing: 0; margin: 14px 0; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+}
+.grid th, .grid td { border-bottom: 1px solid var(--border); padding: 10px 12px; text-align: left; font-size: 13px; vertical-align: middle; }
+.grid tr:last-child td { border-bottom: none; }
+.grid th { color: var(--muted); font-weight: 700; font-size: 11.5px; letter-spacing: .04em; background: var(--panel-soft); }
+.grid tbody tr:hover { background: var(--panel-soft); }
+.grid tbody tr.clickable { cursor: pointer; }
+.grid tbody tr.clickable:hover { background: var(--accent-soft); }
+
+.ext-form, .upload-form, .mbox-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+/* 서명 목록: 내용 칸은 한 줄로 잘라 표가 서명 길이에 끌려가지 않게 한다 */
+.sig-grid td { word-break: break-all; }
+.sig-grid td:nth-last-child(2), .sig-grid th:nth-last-child(2)
+  { white-space: nowrap; word-break: keep-all; text-align: center; }
+.sig-grid td:last-child { text-align: center; }
+.sig-grid td:last-child button.link { padding: 4px 6px; }
+/* 내용 칸만 남는 너비를 먹고 줄임표로 끝낸다 — 폭이 정해진 나머지 열이 기준을 준다 */
+.sig-grid { table-layout: fixed; }
+.sig-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+/* 서명 팝업: 내용은 라벨 아래로 내려 에디터가 팝업 너비를 다 쓰게 한다 */
+.sig-form > .sig-body { display: block; }
+.sig-form > .sig-body > label { display: block; width: auto; margin-bottom: 6px; }
+/* 서명은 몇 줄짜리다. 메일 본문용 260px 은 팝업에서 너무 깊다 */
+.sig-form .lx-input, .sig-form .lx-source, .sig-form .lx-src { min-height: 170px; }
+.rules section { border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; margin: 14px 0; background: var(--panel); box-shadow: var(--sh-1); }
+.rule { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px; margin: 10px 0; background: var(--panel-soft); }
+.rule-head { display: flex; gap: 10px; align-items: center; }
+.rule-head input { flex: 1; }
+/* 조건 한 행: 항목 · 값 · 서술 · 삭제 네 칸을 고정해 행끼리 세로로 맞춘다 */
+.cond { display: grid; grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.cond + .cond { margin-top: 6px; }
+.cond > select, .cond > input { min-width: 0; }
+.cond > .hint { white-space: nowrap; }
+.cond > button.link { padding: 4px 6px; justify-self: end; }
+.rule-grid tr.clickable { cursor: pointer; }
+.rule-grid tr.clickable:hover { background: var(--accent-soft); }
+.rule-grid td { word-break: break-all; }
+/* 사용 · 삭제 열은 줄바꿈 없이 한 줄로 */
+.rule-grid th:last-child, .rule-grid td:last-child,
+.rule-grid th:nth-last-child(2), .rule-grid td:nth-last-child(2) { white-space: nowrap; word-break: keep-all; text-align: center; }
+.rule-grid td:last-child button.link { padding: 4px 6px; }
+/* 규칙 팝업: 모든 줄을 '라벨(124px) + 내용' 한 가지 틀로 맞춘다 */
+.rule-form { display: flex; flex-direction: column; gap: 12px; }
+.rule-form > .form-row { margin: 0; }
+.rule-form .form-row > label:first-child { width: 124px; }
+.rule-form .form-row > input:not([type]) { flex: 1; min-width: 180px; }
+/* 조건 상자처럼 여러 줄인 내용은 라벨을 첫 줄에 붙여 둔다 */
+.rule-form .form-row.top { align-items: flex-start; }
+.rule-form .form-row.top > label:first-child { padding-top: 9px; }
+/* 라디오·날짜를 한 칸에 묶어 줄이 접혀도 라벨 칸 안으로 밀려들지 않게 한다 */
+.rule-form .row-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.rule-form .date-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.rule-conds {
+  flex: 1; min-width: 0; margin: 0; padding: 10px 12px; background: var(--panel-soft);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.rule-conds > button.link { margin-top: 8px; }
+.notes {
+  font-size: 12px; color: var(--muted); background: var(--panel-soft); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-soft-2); border-radius: var(--r-sm); padding: 12px 14px 12px 28px; line-height: 1.7;
+}
+
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 14px 0; }
+.stat {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--sh-1);
+  font-size: 12.5px; color: var(--muted); font-weight: 600;
+}
+.stat-num {
+  font-size: 26px; font-weight: 800; letter-spacing: -.02em; background-image: var(--accent-grad);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.line-chart { width: 100%; height: 190px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--sh-1); }
+.receipts .search { margin-bottom: 10px; }
+
+/* ───────────────────────────── 반응형 (USR-1 ⑧) */
+@media (max-width: 1180px) {
+  /* 태블릿: 읽기 패널 숨김, 메일 선택 시 목록 위 오버레이 */
+  .list-pane { flex: 1; width: auto; border-right: none; }
+  /* 읽기 패널이 목록 위를 덮는 폭이라 나눌 경계가 없다 */
+  .splitter { display: none; }
+  .read-pane { display: none; }
+  .read-pane.has-active { display: flex; position: absolute; inset: 0; z-index: 20; }
+  .read-search .search { display: none; }
+  .mailbox-header .search-narrow { display: block; }
+  .body { position: relative; }
+  .back-to-list { display: inline-flex; margin-right: auto; }
+  .reading { margin: 10px; padding: 18px 20px 28px; }
+}
+@media (max-width: 720px) {
+  /* 모바일: 사이드 숨김, 햄버거(≡)로 편지함 전환 */
+  .sidebar { display: none; position: absolute; left: 0; top: 0; bottom: 0; z-index: 25; box-shadow: var(--sh-3); background: var(--panel); }
+  .app:not(.sidebar-hidden) .sidebar { display: flex; }
+  .app { --mobile: 1; }
+  .settings-nav { width: 168px; }
+  .settings-content { padding: 16px 14px 32px; }
+  .settings-tabs { padding: 8px 12px 0; }
+  .topbar { padding: 9px 12px; }
+  .top-actions { gap: 4px; font-size: 13px; }
+  .top-actions .who { display: none; }
+  .mailbox-header { padding: 8px 14px; }
+  .mailbox-header .search-narrow { margin-left: 0; width: 100%; }
+  .mailbox-header .search input { flex: 1; width: auto; }
+  .row { padding: 10px 12px; }
+  .reading { margin: 0; border: none; border-radius: 0; box-shadow: none; }
+  .appointment-line, .attach-panel { margin-left: 0; }
+  .field > span:first-child, .field-label { width: 64px; }
+  .field > span.field-label-add { width: 76px; } /* + 버튼이 들어가 조금 넓다 */
+  .fab { right: 18px; bottom: 18px; width: 52px; height: 52px; font-size: 22px; }
+  /* 규칙 팝업: 라벨 칸을 접고 내용을 아래로 내린다 */
+  .rule-form > .form-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .rule-form .form-row > label:first-child { width: auto; padding-top: 0; }
+  .rule-form .form-row.top > label:first-child { padding-top: 0; }
+  /* 좁은 화면에서는 항목·값을 각각 한 줄로 내린다 */
+  .cond { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .cond > select, .cond > input { flex: 1 1 100%; }
+  .cond > .hint { margin-right: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
