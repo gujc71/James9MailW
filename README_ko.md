@@ -79,6 +79,18 @@ npm install
 npm run dev                 # http://127.0.0.1:4000
 ```
 
+**`.env` 에 DB 접속 정보를 반드시 설정해야 합니다.** `DB_USER` · `DB_NAME` 은 기본값이 없어, 없으면 서버가
+기동하지 않습니다. James9Mail 이 쓰는 것과 **같은 DB** 를 가리키게 합니다 (`james-database.properties` 참고).
+
+```ini
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=change-me      # DB 계정의 실제 비밀번호
+DB_NAME=james_db
+DB_POOL_SIZE=10            # 조회 전용 풀 크기. James 배달 트랜잭션과 커넥션을 다투지 않도록 분리합니다
+```
+
 ### 2) 클라이언트
 
 ```bash

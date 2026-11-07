@@ -82,6 +82,18 @@ npm install
 npm run dev                 # http://127.0.0.1:4000
 ```
 
+**You must set the DB connection details in `.env`.** `DB_USER` and `DB_NAME` have no defaults — the server
+refuses to start without them. Point them at the **same DB** James9Mail uses (see `james-database.properties`).
+
+```ini
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=change-me      # the real password of the DB account
+DB_NAME=james_db
+DB_POOL_SIZE=10            # read-only pool size, kept apart from James's delivery transactions
+```
+
 ### 2) Client
 
 ```bash
